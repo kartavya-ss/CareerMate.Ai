@@ -600,9 +600,18 @@ Important:
         ]
     )
 
+    disclaimer = (
+        "\n\n---\n"
+        "*Job listings above were retrieved via live web search and may be "
+        "generic, outdated, or occasionally inaccurate. Always verify a "
+        "listing directly on the company's careers page before applying.*"
+    )
+
+    final_text = str(response.content) + disclaimer
+
     return {
-        "final_response": response.content,
-        "messages": [response],
+        "final_response": final_text,
+        "messages": [AIMessage(content=final_text)],
         "llm_calls": state.get("llm_calls", 0) + 1,
     }
 
@@ -686,16 +695,28 @@ graph.add_edge("guardrail_blocked", END)
 # =========================
 # PostgreSQL Checkpointer
 # =========================
-DATABASE_URL = get_database_url()
-_conn = psycopg.connect(
-    DATABASE_URL,
-    autocommit=True,
-    row_factory=dict_row,
-)
-checkpointer = PostgresSaver(_conn)
-checkpointer.setup()
+# Set CAREERMATE_SKIP_DB=1 to import this module without opening a real
+# database connection - used by tests that only need the pure helper
+# functions above (_trim, _json_from_llm, _empty_constraints, etc.) and
+# don't need the full LangGraph checkpointer.
+_SKIP_DB = os.getenv("CAREERMATE_SKIP_DB") == "1"
 
-career_graph = graph.compile(checkpointer=checkpointer)
+if _SKIP_DB:
+    DATABASE_URL = None
+    _conn = None
+    checkpointer = None
+    career_graph = None
+else:
+    DATABASE_URL = get_database_url()
+    _conn = psycopg.connect(
+        DATABASE_URL,
+        autocommit=True,
+        row_factory=dict_row,
+    )
+    checkpointer = PostgresSaver(_conn)
+    checkpointer.setup()
+
+    career_graph = graph.compile(checkpointer=checkpointer)
 
 
 # =========================
