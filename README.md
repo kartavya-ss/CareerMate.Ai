@@ -1,87 +1,121 @@
-# Multi-Agent-System-using-LangGraph-MCP-Supervisor-Guardrails-HITL
+# CareerMate AI
 
-A demo multi-agent system that uses LangGraph and MCP to implement a travel-planning assistant with a Supervisor, input Guardrails, and Human-In-The-Loop (HITL) approval flows. The project includes a FastAPI frontend, example MCP server, and client helpers to demonstrate how agents, supervisors, and guardrails can be composed into a safe, reviewable planning pipeline.
+A multi-agent AI system that helps job seekers go from resume to tailored application — built with **LangGraph**, **MCP (Model Context Protocol)**, a **Supervisor agent**, **input guardrails**, and a **Human-in-the-Loop (HITL)** approval step.
 
-Key ideas:
-- Multi-agent coordination using LangGraph and MCP
-- Supervisor agent to manage complex workflows
-- Input guardrails to validate user requests
-- Human-in-the-loop approval for generated plans
+Give it a resume (PDF) and a target role, and it will:
+1. Parse your resume into a structured skills/experience profile
+2. Search live job listings matching your target role and location
+3. Compare your skills against what the roles require and flag gaps
+4. Score your overall fit and identify risk areas
+5. Draft a shortlist + tailored cover letter — which **you review and approve or send back for revision** before the final version is generated
 
-Contents
-- `app.py`: FastAPI web frontend and API endpoints
-- `backend.py`: core agent orchestration / travel-planner logic
-- `mcp_client.py`: client helpers to interact with the MCP server
-- `custom_weather_mcp_server.py`: example MCP server for weather checks
-- `templates/`, `static/`: frontend UI assets (HTML, JS, CSS)
+---
 
-Features
-- Interactive web UI for sending travel planning prompts
-- Endpoint for drafting travel plans and separate approval endpoint
-- Example MCP server demonstrating domain adapters (weather, checkpoints)
+## Why this exists
 
-Prerequisites
-- Python 3.10+ (recommended)
-- Git (to clone the repo)
-- A virtual environment tool (venv) or similar
+Most resume tools either just parse a PDF or just search jobs. CareerMate AI chains both together with an LLM reasoning about fit in between, and — critically — keeps a human in the loop before anything is finalized, rather than auto-generating an application end-to-end.
 
-Quick start (Windows)
+## Architecture
 
-1. Create and activate a virtual environment
+| Agent | Role |
+|---|---|
+| **Supervisor** | Validates the request and decides which specialist agents are needed (e.g., a "resume review only" request skips the job-search and skill-gap agents) |
+| **Guardrails** | Blocks requests unrelated to job search/resume help, and attempts at prompt injection |
+| **Resume Agent** | Extracts a structured profile (skills, experience, education) from the uploaded resume PDF |
+| **Job Search Agent** | Uses a Tavily MCP server to pull real, current job listings matching the target role/location |
+| **Skill Gap Agent** | Uses a custom local MCP server to compare resume skills against role requirements and report matched/missing skills |
+| **Match Agent** | LLM reasons about overall fit, strengths, and risk areas |
+| **Application Agent** | Synthesizes a shortlist + tailored cover letter into a draft |
+| **Human-in-the-Loop** | Pauses the workflow for the user to approve the draft or send it back with revision feedback |
+| **Final Agent** | Produces the polished, final response incorporating any human feedback |
 
-```powershell
-python -m venv .venv
-.venv\Scripts\Activate.ps1    # PowerShell
+All agents run as nodes in a single LangGraph graph with conditional routing, so the Supervisor can skip agents that aren't relevant to a given request rather than always running the full pipeline.
+
+## Tech stack
+
+- **LangGraph** — agent orchestration and state graph
+- **MCP (Model Context Protocol)** — tool integration for both the job-search agent (Tavily) and the skill-gap agent (custom local server)
+- **Groq** (`openai/gpt-oss-120b`) — LLM inference
+- **FastAPI** — backend API
+- **PostgreSQL** — LangGraph checkpoint persistence (enables the pause/resume HITL flow across requests)
+- **pypdf** — resume PDF text extraction
+
+## Project structure
+
+```
+app.py                          # FastAPI app + API endpoints
+backend.py                      # LangGraph state, agents, routing, HITL logic
+mcp_client.py                   # MCP client: Tavily + skill-gap server connections
+custom_skill_gap_mcp_server.py  # Custom MCP server for skill matching
+templates/index.html            # Frontend UI
+static/script.js                # Frontend logic
+static/style.css                # Frontend styling
 ```
 
-2. Install dependencies
+## Setup
 
-```powershell
+### Prerequisites
+- Python 3.10+
+- A [Groq](https://console.groq.com) API key
+- A [Tavily](https://tavily.com) API key
+- A Postgres database (e.g., a free [Neon](https://neon.tech) project)
+
+### Install
+
+```bash
+python -m venv venv
+venv\Scripts\activate          # Windows
 pip install -r requirements.txt
 ```
 
-3. Run the FastAPI app (development)
+### Configure
 
-```powershell
-# option A (run module)
+Create a `.env` file in the project root:
+
+```
+GROQ_API_KEY=your_groq_key
+TAVILY_API_KEY=your_tavily_key
+DATABASE_URL=your_postgres_connection_string
+```
+
+### Run
+
+```bash
 python app.py
-
-# option B (uvicorn)
-uvicorn app:app --reload --host 127.0.0.1 --port 8000
 ```
 
-4. Open the web UI
+Visit `http://127.0.0.1:8000`.
 
-Visit http://127.0.0.1:8000 in your browser to use the TripMate frontend.
+## API
 
-Running the MCP server (example)
-- The repository includes `custom_weather_mcp_server.py` as an example MCP server. Run it in a separate terminal if you want to experiment with custom adapters used by the demo.
+- `POST /api/career` — form-data: `message` (text), `thread_id` (optional), `resume_file` (optional PDF). Starts or continues a career-assistant thread.
+- `POST /api/career/approve` — JSON: `{ "thread_id": "...", "approved": true|false, "feedback": "..." }`. Resumes a paused thread after human review.
+- `GET /health` — health check.
 
-```powershell
-# start example MCP server (if needed)
-python custom_weather_mcp_server.py
-```
+## Design decisions worth knowing about
 
-API Endpoints
-- `POST /api/travel` — create or resume a travel planning thread. JSON: `{ "message": "<user prompt>", "thread_id": "optional-thread-id" }`
-- `POST /api/travel/approve` — approve or request revisions for a draft. JSON: `{ "thread_id": "<id>", "approved": true|false, "feedback": "optional" }`
-- `GET /health` — basic health check and features list
+**Why a Supervisor instead of a fixed pipeline?**
+Not every request needs every agent — a plain resume review shouldn't trigger a job search. The Supervisor reads the request and picks only the relevant agents, saving LLM calls and keeping responses focused.
 
-Configuration & environment
-- Secrets and API keys are not included in the repo. Use environment variables or a `.env` file for any required keys consumed by `langgraph`, `langchain`, or other adapters.
+**Why cap intermediate context length (`_trim` helper)?**
+Later agents (Match, Application, Final) build on earlier agents' output. Without limits, these prompts grow large enough to exceed provider rate limits (e.g., Groq's free-tier tokens-per-minute cap). Each agent truncates the intermediate context it receives from earlier steps to stay within limits without losing the quality of the final output.
 
-Development notes
-- The project keeps synchronous convenience wrappers in `backend.py` while running an async FastAPI server — `nest_asyncio` is applied in `app.py` to allow the sync helpers to call async MCP helpers.
-- Tests are not included; to experiment, interact with the web UI or call the API endpoints directly.
+**Why MCP instead of calling APIs directly?**
+MCP decouples tool logic from agent logic — the job-search agent doesn't need to know how Tavily's API works, and the skill-gap agent's matching logic lives in its own server, independently testable and swappable.
 
-Contributing
-- Contributions are welcome. Please open issues or pull requests for bug fixes, documentation improvements, or new adapter examples.
+**Why Human-in-the-Loop before finalizing?**
+A generated cover letter or shortlist can be wrong, mistimed, or just not the user's voice. Pausing for explicit approval (or revision feedback) before finalizing avoids blindly sending out AI-written content on the user's behalf.
 
-License
-- This repository follows the license in the `LICENSE` file.
+## Known limitations
 
-Acknowledgements
-- Built as a demonstration of LangGraph + MCP patterns with supervisor and guardrail concepts.
+- **Job listings are not guaranteed accurate or current.** The job-search agent surfaces what live web search returns, and instructs the model not to invent postings — but results can occasionally be generic or under-specific when a strong match isn't found. Always verify a listing on the company's site before applying.
+- **Skill-gap matching uses a small built-in skill taxonomy** for a handful of common roles (backend/frontend developer, data analyst, data scientist) plus keywords found in retrieved job listings. It is not a comprehensive skills database.
+- **No automated test suite yet** — the project has been manually verified end-to-end (resume upload → draft → approve/revise → final output) but does not yet have unit tests.
 
-Contact
-- For questions or suggestions, open an issue or contact the repository owner.
+## Acknowledgements
+
+Built on top of the architecture pattern from an open-source LangGraph + MCP + Supervisor + Guardrails + HITL demo project, adapted here into a job-application assistant with a new agent set, a new custom MCP server, PDF resume upload, and rate-limit-aware prompt design.
+
+## License
+
+See `LICENSE`.
