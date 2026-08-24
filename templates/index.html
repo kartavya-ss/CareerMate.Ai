@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>TripMate AI</title>
+  <title>CareerMate AI</title>
   <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
@@ -16,21 +16,22 @@
   <main class="app-container">
     <section class="hero-section">
       <div class="badge">
-        ✈️ TripMate AI — LangGraph, MCP, Supervisor, Guardrails & HITL
+        💼 CareerMate AI — LangGraph, MCP, Supervisor, Guardrails & HITL
       </div>
-      <h1>Plan Your Perfect Trip with AI</h1>
+      <h1>Land Your Next Role with AI</h1>
       <p>
-        Search flights, discover hotels, check weather, assess your budget,
-        and review the AI-generated draft before the final itinerary is created.
+        Upload your resume, search real job listings, spot skill gaps, get an
+        honest fit assessment, and review the AI-generated cover letter and
+        shortlist before the final version is created.
       </p>
     </section>
 
     <section class="planner-card">
       <div class="card-header">
         <div>
-          <h2>Where do you want to go?</h2>
+          <h2>What role are you targeting?</h2>
           <p>
-            Example: Plan a complete 7 days Japan trip from Bangladesh under 2 lakhs.
+            Example: I want backend developer roles in Bangalore, entry-level.
           </p>
         </div>
         <div class="status-pill">
@@ -42,8 +43,19 @@
       <div class="input-area">
         <textarea
           id="userInput"
-          placeholder="Plan a complete 7 days Japan trip including flights, hotels and sightseeing under 2 lakhs..."
+          placeholder="I want backend developer roles in Bangalore, entry-level. Here's what I'm looking for..."
         ></textarea>
+
+        <label for="resumeFile" class="resume-upload-label">
+          📄 <span id="resumeFileName">Upload resume (PDF)</span>
+        </label>
+        <input
+          type="file"
+          id="resumeFile"
+          accept="application/pdf"
+          class="resume-upload-input"
+        />
+
         <button id="sendBtn" onclick="sendMessage()">
           <span id="btnText">Generate Draft</span>
           <span id="btnLoader" class="loader hidden"></span>
@@ -51,17 +63,17 @@
       </div>
 
       <div class="quick-prompts">
-        <button onclick="setPrompt('Plan a complete 7 days Japan trip from Bangladesh including flights, hotels and sightseeing under 2 lakhs.')">
-          Japan Trip
+        <button onclick="setPrompt('I want backend developer roles in Bangalore, entry-level.')">
+          Backend Developer
         </button>
-        <button onclick="setPrompt('Plan a 5 days Dubai trip from Dhaka with flights, hotels and sightseeing.')">
-          Dubai Trip
+        <button onclick="setPrompt('I want frontend developer roles remote, 1-2 years experience.')">
+          Frontend Developer
         </button>
-        <button onclick="setPrompt('Plan a 7 days Thailand trip from Bangladesh with budget hotels and sightseeing.')">
-          Thailand Trip
+        <button onclick="setPrompt('I want data analyst roles in Bangalore for a fresher.')">
+          Data Analyst
         </button>
-        <button onclick="setPrompt('Give me all country flight info.')">
-          Global Flights
+        <button onclick="setPrompt('Just review my resume and tell me my strengths and weaknesses.')">
+          Resume Review Only
         </button>
       </div>
     </section>
@@ -81,7 +93,7 @@
     <section id="resultSection" class="result-section hidden">
       <div class="result-header">
         <div>
-          <h2 id="resultTitle">Your AI Travel Plan</h2>
+          <h2 id="resultTitle">Your Application Plan</h2>
           <p id="threadInfo">Thread ID: -</p>
         </div>
         <div class="result-actions">
@@ -91,7 +103,7 @@
       </div>
 
       <div id="pdfContent" class="pdf-content">
-        <h1 class="pdf-title">AI Travel Plan</h1>
+        <h1 class="pdf-title">AI Career Application Plan</h1>
         <div id="resultBox" class="result-box"></div>
       </div>
     </section>
@@ -100,15 +112,15 @@
       <div class="approval-icon">👤</div>
       <div class="approval-content">
         <span class="eyebrow">Human-in-the-Loop</span>
-        <h2>Review the draft itinerary</h2>
+        <h2>Review the draft application</h2>
         <p id="approvalRequest">
-          Approve the draft or provide feedback before the final plan is generated.
+          Approve the draft or provide feedback before the final version is generated.
         </p>
 
         <textarea
           id="approvalFeedback"
           class="feedback-input"
-          placeholder="Add revision feedback, for example: reduce the hotel cost and add one free day..."
+          placeholder="Add revision feedback, for example: make the cover letter shorter and more confident..."
         ></textarea>
 
         <div class="approval-actions">
@@ -126,7 +138,7 @@
   </main>
 
   <footer>
-    Built with FastAPI, LangGraph, Groq, PostgreSQL, Tavily, AviationStack and MCP
+    Built with FastAPI, LangGraph, Groq, PostgreSQL, Tavily and MCP
   </footer>
 
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>

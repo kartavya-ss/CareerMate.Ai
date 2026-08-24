@@ -2,16 +2,18 @@ from pathlib import Path
 import traceback
 
 import uvicorn
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, UploadFile, File, Form
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field
+from pypdf import PdfReader
+import io
 
-from backend import run_travel_agent, resume_travel_agent
+from backend import run_career_agent, resume_career_agent
 
-# This is kept from the original project to allow the existing synchronous
-# agent functions to call async MCP helpers inside FastAPI.
+# Kept from the original project to allow the existing synchronous agent
+# functions to call async MCP helpers inside FastAPI.
 import nest_asyncio
 
 nest_asyncio.apply()
@@ -19,12 +21,12 @@ nest_asyncio.apply()
 BASE_DIR = Path(__file__).resolve().parent
 
 app = FastAPI(
-    title="TripMate AI",
+    title="CareerMate AI",
     description=(
-        "LangGraph Multi-Agent Travel Planner with Supervisor, Guardrails, "
-        "Human-in-the-Loop, and FastAPI Frontend"
+        "LangGraph Multi-Agent Job Application Assistant with Supervisor, "
+        "Guardrails, Human-in-the-Loop, and FastAPI Frontend"
     ),
-    version="2.0.0",
+    version="1.0.0",
 )
 
 app.mount(
@@ -36,15 +38,16 @@ app.mount(
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 
 
-class TravelRequest(BaseModel):
-    message: str
-    thread_id: str | None = None
-
-
 class ApprovalRequest(BaseModel):
     thread_id: str = Field(min_length=1)
     approved: bool
     feedback: str = ""
+
+
+def _extract_pdf_text(file_bytes: bytes) -> str:
+    reader = PdfReader(io.BytesIO(file_bytes))
+    pages_text = [page.extract_text() or "" for page in reader.pages]
+    return "\n".join(pages_text).strip()
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -56,10 +59,14 @@ async def home(request: Request):
     )
 
 
-@app.post("/api/travel")
-async def travel_planner(request_data: TravelRequest):
+@app.post("/api/career")
+async def career_assistant(
+    message: str = Form(...),
+    thread_id: str | None = Form(None),
+    resume_file: UploadFile | None = File(None),
+):
     try:
-        user_message = request_data.message.strip()
+        user_message = message.strip()
 
         if not user_message:
             return JSONResponse(
@@ -70,9 +77,24 @@ async def travel_planner(request_data: TravelRequest):
                 },
             )
 
-        result = run_travel_agent(
+        resume_text = ""
+        if resume_file is not None:
+            if resume_file.content_type != "application/pdf":
+                return JSONResponse(
+                    status_code=400,
+                    content={
+                        "success": False,
+                        "error": "Only PDF resumes are supported right now.",
+                    },
+                )
+
+            file_bytes = await resume_file.read()
+            resume_text = _extract_pdf_text(file_bytes)
+
+        result = run_career_agent(
             user_input=user_message,
-            thread_id=request_data.thread_id,
+            resume_text=resume_text,
+            thread_id=thread_id,
         )
 
         return JSONResponse(
@@ -95,8 +117,8 @@ async def travel_planner(request_data: TravelRequest):
         )
 
 
-@app.post("/api/travel/approve")
-async def approve_travel_plan(request_data: ApprovalRequest):
+@app.post("/api/career/approve")
+async def approve_application(request_data: ApprovalRequest):
     try:
         if not request_data.approved and not request_data.feedback.strip():
             return JSONResponse(
@@ -107,7 +129,7 @@ async def approve_travel_plan(request_data: ApprovalRequest):
                 },
             )
 
-        result = resume_travel_agent(
+        result = resume_career_agent(
             thread_id=request_data.thread_id,
             approved=request_data.approved,
             feedback=request_data.feedback,
@@ -137,7 +159,7 @@ async def approve_travel_plan(request_data: ApprovalRequest):
 async def health_check():
     return {
         "status": "ok",
-        "message": "TripMate AI API is running",
+        "message": "CareerMate AI API is running",
         "features": [
             "supervisor_agent",
             "input_guardrail",

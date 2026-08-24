@@ -1,18 +1,31 @@
-let currentThreadId = localStorage.getItem("travel_thread_id") || null;
+let currentThreadId = localStorage.getItem("career_thread_id") || null;
 let latestAnswerMarkdown = "";
 let waitingForApproval = false;
 
 const AGENT_LABELS = {
-  flight_agent: "✈️ Flight Agent",
-  hotel_agent: "🏨 Hotel Agent",
-  weather_agent: "🌦️ Weather Agent",
-  budget_agent: "💰 Budget Agent",
-  itinerary_agent: "🗓️ Itinerary Agent"
+  resume_agent: "📄 Resume Agent",
+  job_search_agent: "🔎 Job Search Agent",
+  skill_gap_agent: "🧩 Skill Gap Agent",
+  match_agent: "🎯 Match Agent",
+  application_agent: "✉️ Application Agent"
 };
 
 function setPrompt(text) {
   document.getElementById("userInput").value = text;
 }
+
+document.addEventListener("DOMContentLoaded", () => {
+  const resumeInput = document.getElementById("resumeFile");
+  const resumeLabel = document.getElementById("resumeFileName");
+
+  resumeInput.addEventListener("change", () => {
+    if (resumeInput.files.length > 0) {
+      resumeLabel.textContent = resumeInput.files[0].name;
+    } else {
+      resumeLabel.textContent = "Upload resume (PDF)";
+    }
+  });
+});
 
 function setLoading(isLoading, mode = "draft") {
   const sendBtn = document.getElementById("sendBtn");
@@ -92,7 +105,7 @@ function showResult(answer, threadId, isDraft = false) {
 
   renderMarkdown(resultBox, latestAnswerMarkdown);
   threadInfo.textContent = `Thread ID: ${threadId}`;
-  resultTitle.textContent = isDraft ? "Draft Travel Plan" : "Your Final AI Travel Plan";
+  resultTitle.textContent = isDraft ? "Draft Application" : "Your Final Application Plan";
   resultSection.classList.remove("hidden");
 
   resultSection.scrollIntoView({
@@ -106,7 +119,7 @@ function showApproval(data) {
   const section = document.getElementById("approvalSection");
   const approvalRequest = document.getElementById("approvalRequest");
   approvalRequest.textContent = data.approval_request ||
-    "Approve the draft or provide feedback before the final plan is generated.";
+    "Approve the draft or provide feedback before the final version is generated.";
   section.classList.remove("hidden");
 }
 
@@ -120,30 +133,36 @@ async function sendMessage() {
   hideError();
 
   if (waitingForApproval) {
-    showError("Please approve or revise the current draft before starting another plan.");
+    showError("Please approve or revise the current draft before starting another request.");
     return;
   }
 
   const input = document.getElementById("userInput");
   const message = input.value.trim();
+  const resumeInput = document.getElementById("resumeFile");
 
   if (!message) {
-    showError("Please enter your travel request first.");
+    showError("Please describe what you're looking for first.");
     return;
   }
 
   setLoading(true, "draft");
 
   try {
-    const response = await fetch("/api/travel", {
+    const formData = new FormData();
+    formData.append("message", message);
+
+    if (currentThreadId) {
+      formData.append("thread_id", currentThreadId);
+    }
+
+    if (resumeInput.files.length > 0) {
+      formData.append("resume_file", resumeInput.files[0]);
+    }
+
+    const response = await fetch("/api/career", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        message: message,
-        thread_id: currentThreadId
-      })
+      body: formData
     });
 
     const data = await response.json();
@@ -153,12 +172,12 @@ async function sendMessage() {
     }
 
     currentThreadId = data.thread_id;
-    localStorage.setItem("travel_thread_id", currentThreadId);
+    localStorage.setItem("career_thread_id", currentThreadId);
 
     showWorkflow(data);
 
     if (data.requires_approval) {
-      showResult(data.itinerary || data.answer, data.thread_id, true);
+      showResult(data.application_draft || data.answer, data.thread_id, true);
       showApproval(data);
     } else {
       hideApproval();
@@ -191,7 +210,7 @@ async function submitApproval(approved) {
   setLoading(true, "approval");
 
   try {
-    const response = await fetch("/api/travel/approve", {
+    const response = await fetch("/api/career/approve", {
       method: "POST",
       headers: {
         "Content-Type": "application/json"
@@ -206,7 +225,7 @@ async function submitApproval(approved) {
     const data = await response.json();
 
     if (!response.ok || !data.success) {
-      throw new Error(data.error || "Could not resume the travel workflow.");
+      throw new Error(data.error || "Could not resume the career-assistant workflow.");
     }
 
     showWorkflow(data);
@@ -246,7 +265,7 @@ function downloadPDF() {
   const pdfContent = document.getElementById("pdfContent");
 
   if (!latestAnswerMarkdown || !pdfContent) {
-    showError("No travel plan available to download.");
+    showError("No application plan available to download.");
     return;
   }
 
@@ -257,7 +276,7 @@ function downloadPDF() {
 
   const options = {
     margin: 0.5,
-    filename: "ai-travel-plan.pdf",
+    filename: "ai-career-plan.pdf",
     image: {
       type: "jpeg",
       quality: 0.98

@@ -615,3 +615,28 @@ footer {
     grid-template-columns: 1fr;
   }
 }
+/* Add this block to your existing static/style.css */
+
+.resume-upload-input {
+  display: none;
+}
+
+.resume-upload-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  margin-top: 8px;
+  margin-bottom: 8px;
+  border: 1px dashed rgba(255, 255, 255, 0.3);
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  width: fit-content;
+  transition: border-color 0.2s ease, background-color 0.2s ease;
+}
+
+.resume-upload-label:hover {
+  border-color: rgba(255, 255, 255, 0.6);
+  background-color: rgba(255, 255, 255, 0.05);
+}
